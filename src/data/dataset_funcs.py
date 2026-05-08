@@ -20,6 +20,12 @@ class DataManager:
 
     # Connection/Internal functions
     def _connect(self):
+        """
+        This is a helper function for connecting to the Postgresql database hosting the datasets to be used. This connection function 
+        is expected to be used for each high level transaction, and closed in the same transaction, for example in load_table, or 
+        load_filtered. This will be used in combination with the other helper methods, which should also appear in each of the other
+        functions.
+        """
         try:
             self.connection = p2.connect(
                 dbname=os.get_env("DB_NAME"),
@@ -35,14 +41,26 @@ class DataManager:
 
     
     def _close(self):
+        """
+        Helper function for closing the connection to the Postgresql database. This should be used in every transaction, either at the 
+        end, when a transaction has been completed, or in any exceptions, which will implicitly call a rollback function.
+        """
         self.connection.close()
 
     
     def _commit(self):
+        """
+        Finalise a transaction, committing the change to the DB. 
+        """
         self.connection.commit()
 
 
     def _rollback(self):
+        """
+        Roll back a transaction. This is to be used in instances where the connection will not be closed when there is an error, for example
+        during batch uploads or inserts, where each batch would be committed, and any failed batches will call the rollback function, and 
+        print a message to the user, saying that the batch had resulted in an error, and been rolled back.
+        """
         self.connection.rollback()
 
 
