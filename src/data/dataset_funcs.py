@@ -89,8 +89,9 @@ class DataManager:
                         information_schema.tables
                             
                     WHERE 
-                        table_name = %(table_name)s;
-                """, {'table_name': table_name})
+                        table_name = %(table_name)s;"""
+                    
+                    ,{'table_name': table_name})
 
                 res = curr.fetchone()[1]
 
@@ -108,8 +109,37 @@ class DataManager:
         pass
 
 
-    def table_exists(table_name: str) -> str:
-        pass
+    def table_exists(self, 
+                     table_name: str) -> str:
+        """
+        Confirm whether or not a table exists already, to use as a check before writing to or
+        trying to load tables, rather than getting an error.
+        """
+
+        self._connect()
+
+        try: 
+            with self.connection.cursor() as curr:
+                curr.execute("""
+                    SELECT table_name
+                    
+                    FROM
+                        information_schema.tables
+                            
+                    WHERE 
+                        table_name = %(table_name)s;"""
+                    
+                    ,{'table_name': table_name})
+
+                res = curr.fetchone()
+
+            return True if res is not None else False
+        
+        except (Exception, p2.DatabaseError) as e:
+            print(e)
+
+        finally:
+            self._close()
     
 
     # Accessing functions 
@@ -162,3 +192,9 @@ class DataManager:
 
     def delete_table(table_name: str) -> None:
         pass
+
+dm = DataManager()
+
+res = dm.table_exists("pg_description")
+
+print(res)
