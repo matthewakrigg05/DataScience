@@ -1,6 +1,9 @@
 import pandas as pd
 import psycopg2 as p2
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class DataManager:
     """
@@ -16,10 +19,11 @@ class DataManager:
 
     def __init__(self):
         self._connect()
+        self._close()
 
 
     # Connection/Internal functions
-    def _connect(self):
+    def _connect(self) -> None:
         """
         This is a helper function for connecting to the Postgresql database hosting the datasets to be used. This connection function 
         is expected to be used for each high level transaction, and closed in the same transaction, for example in load_table, or 
@@ -28,10 +32,10 @@ class DataManager:
         """
         try:
             self.connection = p2.connect(
-                dbname=os.get_env("DB_NAME"),
-                user=os.get_env("DB_USER"),
-                password=os.get_env("DB_PASSWORD"),
-                host=os.get_env("DB_HOST")
+                dbname=os.getenv("DB_NAME"),
+                user=os.getenv("DB_USER"),
+                password=os.getenv("DB_PASSWORD"),
+                host=os.getenv("DB_HOST")
             )
 
             print('Connection successful.')
@@ -40,7 +44,7 @@ class DataManager:
             print(e)
 
     
-    def _close(self):
+    def _close(self) -> None:
         """
         Helper function for closing the connection to the Postgresql database. This should be used in every transaction, either at the 
         end, when a transaction has been completed, or in any exceptions, which will implicitly call a rollback function.
@@ -48,14 +52,14 @@ class DataManager:
         self.connection.close()
 
     
-    def _commit(self):
+    def _commit(self) -> None:
         """
         Finalise a transaction, committing the change to the DB. 
         """
         self.connection.commit()
 
 
-    def _rollback(self):
+    def _rollback(self) -> None:
         """
         Roll back a transaction. This is to be used in instances where the connection will not be closed when there is an error, for example
         during batch uploads or inserts, where each batch would be committed, and any failed batches will call the rollback function, and 
@@ -65,8 +69,38 @@ class DataManager:
 
 
     # Metadata Functions
-    def get_schema(table_name: str) -> str:
-        pass
+    def get_schema(self, 
+                   table_name: str) -> str:
+        """
+        Accesses metadata, finding the scema of a given table. Useful helper for context in projects,
+        and ensuring that projects are using the same schemas.
+        """
+
+        self._connect()
+
+        try: 
+            with self.connection.cursor() as curr:
+                curr.execute("""
+                    SELECT table_catalog
+                            ,table_schema
+                            ,table_name
+                    
+                    FROM
+                        information_schema.tables
+                            
+                    WHERE 
+                        table_name = %(table_name)s;
+                """, {'table_name': table_name})
+
+                res = curr.fetchone()[1]
+
+            return res
+        
+        except (Exception, p2.DatabaseError) as e:
+            print(e)
+
+        finally:
+            self._close()
 
 
     def ensure_schema(table_name: str,
