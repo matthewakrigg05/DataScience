@@ -152,8 +152,34 @@ class DataManager:
     
 
     # Accessing functions 
-    def load_table(table_name: str) -> pd.DataFrame:
-        pass
+    def load_table(self
+                   ,schema: str
+                   ,table_name: str) -> pd.DataFrame:
+        self._connect()
+
+        try: 
+            with self.connection.cursor() as curr:
+                curr.execute(
+                    sql.SQL("""
+                    SELECT 
+                        *
+                    
+                    FROM
+                        {}.{};""").format(
+                            sql.Identifier(schema),
+                            sql.Identifier(table_name)
+                        )
+                    )
+
+                res = curr.fetchall()
+
+            return pd.DataFrame(res)
+        
+        except (Exception, p2.DatabaseError) as e:
+            print(e)
+
+        finally:
+            self._close()
 
 
     def load_from_query(sql: str,
@@ -197,12 +223,13 @@ class DataManager:
     def create_table(self
                      ,schema: str
                      ,table_name: str) -> None:
+        
         self._connect()
 
         try: 
             with self.connection.cursor() as curr:
                 # If the table exists in a different schema, then warn user but create table anyway. This wont
-                # work, tables have to contain something 
+                # work, tables have to contain something. The function needs to create a table based on a df.
                 if self.table_exists(table_name) is None:
                     curr.execute("""
                         CREATE TABLE %(schema)s.%(table_name)s;"""
@@ -248,9 +275,3 @@ class DataManager:
 
         finally:
             self._close()
-
-dm = DataManager()
-
-res = dm.create_table("test_schema", "test_table")
-
-print(dm.delete_table("test_schema","test_table"))
