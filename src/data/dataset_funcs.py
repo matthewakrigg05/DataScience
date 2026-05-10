@@ -185,9 +185,30 @@ class DataManager:
 
 
     # Table Management Functions
-    def create_table(table_name: str,
+    def create_table(self,
+                     table_name: str,
                      schema: str) -> None:
-        pass
+        self._connect()
+
+        try: 
+            with self.connection.cursor() as curr:
+                # If the table exists in a different schema, then warn user but create table anyway
+                if not self.table_exists(table_name):
+                    curr.execute("""
+                        CREATE TABLE IF NOT EXISTS %(schema)s.%(table_name)s;"""
+                        
+                        ,{"schema": schema,
+                        'table_name': table_name})
+
+                    res = curr.fetchone()
+                    
+                    return True if res is not None else False
+        
+        except (Exception, p2.DatabaseError) as e:
+            print(e)
+
+        finally:
+            self._close()
 
 
     def delete_table(table_name: str) -> None:
@@ -195,6 +216,7 @@ class DataManager:
 
 dm = DataManager()
 
-res = dm.table_exists("pg_description")
+res = dm.create_table("test_table",
+                      "data_science")
 
 print(res)
