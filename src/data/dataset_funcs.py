@@ -1,5 +1,6 @@
 import pandas as pd
 import psycopg2 as p2
+from psycopg2 import sql
 import os
 from dotenv import load_dotenv
 
@@ -37,8 +38,6 @@ class DataManager:
                 password=os.getenv("DB_PASSWORD"),
                 host=os.getenv("DB_HOST")
             )
-
-            print('Connection successful.')
         
         except (Exception, p2.DatabaseError) as e:
             print(e)
@@ -113,7 +112,14 @@ class DataManager:
                      table_name: str) -> str:
         """
         Confirm whether or not a table exists already, to use as a check before writing to or
-        trying to load tables, rather than getting an error.
+        trying to load tables, rather than getting an error. This finds tables regardless of
+        schema. This should also not show the postgres catalog.
+
+        Args:
+            - table_name (str): Name of the table being searched for in the data_science DB
+
+        Returns:
+            - Table name, and the schema of the table being searched for, if exists.
         """
 
         self._connect()
@@ -121,19 +127,22 @@ class DataManager:
         try: 
             with self.connection.cursor() as curr:
                 curr.execute("""
-                    SELECT table_name
+                    SELECT 
+                        table_schema
+                        ,table_name
                     
                     FROM
                         information_schema.tables
                             
                     WHERE 
-                        table_name = %(table_name)s;"""
+                        table_name = %(table_name)s
+                        AND table_catalog != 'postgres';"""
                     
                     ,{'table_name': table_name})
 
-                res = curr.fetchone()
+                res = curr.fetchall()
 
-            return True if res is not None else False
+            return res
         
         except (Exception, p2.DatabaseError) as e:
             print(e)
@@ -185,17 +194,18 @@ class DataManager:
 
 
     # Table Management Functions
-    def create_table(self,
-                     table_name: str,
-                     schema: str) -> None:
+    def create_table(self
+                     ,schema: str
+                     ,table_name: str) -> None:
         self._connect()
 
         try: 
             with self.connection.cursor() as curr:
-                # If the table exists in a different schema, then warn user but create table anyway
-                if not self.table_exists(table_name):
+                # If the table exists in a different schema, then warn user but create table anyway. This wont
+                # work, tables have to contain something 
+                if self.table_exists(table_name) is None:
                     curr.execute("""
-                        CREATE TABLE IF NOT EXISTS %(schema)s.%(table_name)s;"""
+                        CREATE TABLE %(schema)s.%(table_name)s;"""
                         
                         ,{"schema": schema,
                         'table_name': table_name})
@@ -211,12 +221,36 @@ class DataManager:
             self._close()
 
 
-    def delete_table(table_name: str) -> None:
-        pass
+    def delete_table(self
+                     ,schema: str
+                     ,table_name: str) -> None:
+        
+        exists = self.table_exists(table_name)
+        self._connect()
+
+        try: 
+            with self.connection.cursor() as curr:
+                # If the table exists in a different schema, then warn user but create table anyway
+                if exists:
+                    curr.execute(
+                        sql.SQL("""
+                        DROP TABLE IF EXISTS {}.{};
+                                """).format(
+                            sql.Identifier(schema),
+                            sql.Identifier(table_name)
+                                )
+                    )
+                    
+                    self._commit()
+        
+        except (Exception, p2.DatabaseError) as e:
+            print(e)
+
+        finally:
+            self._close()
 
 dm = DataManager()
 
-res = dm.create_table("test_table",
-                      "data_science")
+res = dm.create_table("test_schema", "test_table")
 
-print(res)
+print(dm.delete_table("test_schema","test_table"))
