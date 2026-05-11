@@ -155,6 +155,7 @@ class DataManager:
     def load_table(self
                    ,schema: str
                    ,table_name: str) -> pd.DataFrame:
+
         self._connect()
 
         try: 
@@ -223,6 +224,14 @@ class DataManager:
     def create_table(self
                      ,schema: str
                      ,table_name: str) -> None:
+        """
+        Create a table in the PostgreSQL database.
+
+        Args:
+            - schema (str): Schema of table being created.
+            - table_name (str): Name of table being created.
+        """
+
         exists = self.table_exists(table_name)
         self._connect()
 
@@ -249,6 +258,14 @@ class DataManager:
     def delete_table(self
                      ,schema: str
                      ,table_name: str) -> None:
+        """
+        Delete a table from database, requires schema and table name, to ensure deletion of the
+        correct table.
+
+        Args:
+            - schema (str): Schema of the table to be deleted
+            - table_name (str): Name of table to be deleted
+        """
         
         exists = self.table_exists(table_name)
         self._connect()
