@@ -92,7 +92,7 @@ class DataManager:
                     
                     ,{'table_name': table_name})
 
-                res = curr.fetchone()[1]
+                res = curr.fetchall()[1]
 
             return res
         
@@ -108,8 +108,8 @@ class DataManager:
         pass
 
 
-    def table_exists(self, 
-                     table_name: str) -> str:
+    def table_exists(self 
+                     ,table_name: str) -> bool:
         """
         Confirm whether or not a table exists already, to use as a check before writing to or
         trying to load tables, rather than getting an error. This finds tables regardless of
@@ -119,7 +119,7 @@ class DataManager:
             - table_name (str): Name of the table being searched for in the data_science DB
 
         Returns:
-            - Table name, and the schema of the table being searched for, if exists.
+            - (bool) True if exists, false otherwise
         """
 
         self._connect()
@@ -140,9 +140,9 @@ class DataManager:
                     
                     ,{'table_name': table_name})
 
-                res = curr.fetchall()
+                res = curr.fetchone()
 
-            return res
+            return True if res is not None else False
         
         except (Exception, p2.DatabaseError) as e:
             print(e)
@@ -223,23 +223,21 @@ class DataManager:
     def create_table(self
                      ,schema: str
                      ,table_name: str) -> None:
-        
+        exists = self.table_exists(table_name)
         self._connect()
 
         try: 
             with self.connection.cursor() as curr:
                 # If the table exists in a different schema, then warn user but create table anyway. This wont
                 # work, tables have to contain something. The function needs to create a table based on a df.
-                if self.table_exists(table_name) is None:
+                if not exists:
                     curr.execute("""
                         CREATE TABLE %(schema)s.%(table_name)s;"""
                         
                         ,{"schema": schema,
                         'table_name': table_name})
-
-                    res = curr.fetchone()
-                    
-                    return True if res is not None else False
+                                        
+                    return
         
         except (Exception, p2.DatabaseError) as e:
             print(e)
@@ -257,7 +255,6 @@ class DataManager:
 
         try: 
             with self.connection.cursor() as curr:
-                # If the table exists in a different schema, then warn user but create table anyway
                 if exists:
                     curr.execute(
                         sql.SQL("""
