@@ -240,11 +240,13 @@ class DataManager:
                 # If the table exists in a different schema, then warn user but create table anyway. This wont
                 # work, tables have to contain something. The function needs to create a table based on a df.
                 if not exists:
-                    curr.execute("""
-                        CREATE TABLE %(schema)s.%(table_name)s;"""
-                        
-                        ,{"schema": schema,
-                        'table_name': table_name})
+                    curr.execute(
+                        sql.SQL("""CREATE TABLE {}.{};""")
+                        .format(
+                            sql.Identifier(schema),
+                            sql.Identifier(table_name)
+                        )
+                    )
                                         
                     return
         
@@ -274,12 +276,11 @@ class DataManager:
             with self.connection.cursor() as curr:
                 if exists:
                     curr.execute(
-                        sql.SQL("""
-                        DROP TABLE IF EXISTS {}.{};
-                                """).format(
+                        sql.SQL("""DROP TABLE IF EXISTS {}.{};""")
+                        .format(
                             sql.Identifier(schema),
                             sql.Identifier(table_name)
-                                )
+                            )
                     )
                     
                     self._commit()
