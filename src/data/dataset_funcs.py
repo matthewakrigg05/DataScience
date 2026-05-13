@@ -174,7 +174,7 @@ class DataManager:
             self._close()
 
 
-    def load_from_query(self
+    def execute_custom_query(self
                         ,query: str) -> pd.DataFrame:
         """
         Funciton which allows me to execute my own queries, should what I need not already be a function,
