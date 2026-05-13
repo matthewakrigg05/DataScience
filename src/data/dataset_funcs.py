@@ -174,9 +174,31 @@ class DataManager:
             self._close()
 
 
-    def load_from_query(sql: str,
-                        params=None) -> pd.DataFrame:
-        pass
+    def load_from_query(self
+                        ,query: str) -> pd.DataFrame:
+        """
+        Funciton which allows me to execute my own queries, should what I need not already be a function,
+        including dropping, creating, and selecting from tables.
+
+        Args:
+            - query (str): The custom query
+
+        Returns:
+            - Result of the query with no transformations
+        """
+        self._connect()
+
+        try: 
+            with self.connection.cursor() as curr:
+                curr.execute(sql.SQL(query))
+                                        
+                return curr.fetchall()
+        
+        except (Exception, p2.DatabaseError) as e:
+            print(e)
+
+        finally:
+            self._close()
 
 
     def load_filtered(table_name: str,
