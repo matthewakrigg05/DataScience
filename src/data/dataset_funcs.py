@@ -58,15 +58,6 @@ class DataManager:
         self.connection.commit()
 
 
-    def _rollback(self) -> None:
-        """
-        Roll back a transaction. This is to be used in instances where the connection will not be closed when there is an error, for example
-        during batch uploads or inserts, where each batch would be committed, and any failed batches will call the rollback function, and 
-        print a message to the user, saying that the batch had resulted in an error, and been rolled back.
-        """
-        self.connection.rollback()
-
-
     # Metadata Functions
     def get_schema(self, 
                    table_name: str) -> str:
