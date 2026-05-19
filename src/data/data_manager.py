@@ -1,7 +1,9 @@
 import pandas as pd
 import psycopg2 as p2
-from psycopg2 import sql
 import os
+
+from sqlalchemy import create_engine
+from psycopg2 import sql
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -18,7 +20,17 @@ class DataManager:
 
     connection = None
 
-    def __init__(self):
+    dbname=os.getenv("DB_NAME")
+    user=os.getenv("DB_USER")
+    password=os.getenv("DB_PASSWORD")
+    current_server_address = None
+
+    def __init__(self, current_server_address=None):
+        if current_server_address is None:
+            self.current_server_address = os.getenv("DB_HOST")
+        else:
+            self.current_server_address = current_server_address
+
         self._connect()
         self._close()
 
@@ -33,10 +45,10 @@ class DataManager:
         """
         try:
             self.connection = p2.connect(
-                dbname=os.getenv("DB_NAME"),
-                user=os.getenv("DB_USER"),
-                password=os.getenv("DB_PASSWORD"),
-                host=os.getenv("DB_HOST")
+                dbname=self.dbname,
+                user=self.user,
+                password=self.password,
+                host=self.current_server_address
             )
         
         except (Exception, p2.DatabaseError) as e:
@@ -144,7 +156,6 @@ class DataManager:
 
     # Accessing functions 
     def load_table(self
-                   ,schema: str
                    ,table_name: str) -> pd.DataFrame:
 
         self._connect()
@@ -157,8 +168,7 @@ class DataManager:
                         *
                     
                     FROM
-                        {}.{};""").format(
-                            sql.Identifier(schema),
+                        {};""").format(
                             sql.Identifier(table_name)
                         )
                     )
@@ -234,38 +244,63 @@ class DataManager:
 
 
     # Table Management Functions
-    def create_table(self
-                     ,schema: str
-                     ,table_name: str) -> None:
+    def create_table_from_csv(self 
+                              ,schema:str
+                              ,table_name: str
+                              ,file_path: str) -> None:
         """
-        Create a table in the PostgreSQL database.
+        Create a table in the PostgreSQL database using a csv file.
 
         Args:
             - schema (str): Schema of table being created.
             - table_name (str): Name of table being created.
         """
+        if self.table_exists(table_name):
+            return "Table already exists!"
 
-        exists = self.table_exists(table_name)
+        table_identifier = sql.SQL('{}.{}').format(
+                sql.Identifier(schema),
+                sql.Identifier(table_name)
+            )
+
+        dtype_map = {
+            'int64': 'BIGINT', 'Int64': 'BIGINT',
+            'int32': 'INTEGER', 'Int32': 'INTEGER',
+            'float64': 'DOUBLE PRECISION', 'float32': 'REAL',
+            'bool': 'BOOLEAN', 'boolean': 'BOOLEAN',
+            'object': 'TEXT', 'string': 'TEXT',
+            'datetime64[ns]': 'TIMESTAMP', 'category': 'TEXT',
+        }
+
+        sample = pd.read_csv(file_path, nrows=1_000)
+        columns = ', '.join(
+            f'"{col}" {dtype_map.get(str(dtype), "TEXT")}'
+            for col, dtype in sample.dtypes.items()
+        )
+
         self._connect()
-
-        try: 
+        try:
             with self.connection.cursor() as curr:
-                # If the table exists in a different schema, then warn user but create table anyway. This wont
-                # work, tables have to contain something. The function needs to create a table based on a df.
-                if not exists:
-                    curr.execute(
-                        sql.SQL("""CREATE TABLE {}.{};""")
-                        .format(
-                            sql.Identifier(schema),
-                            sql.Identifier(table_name)
-                        )
+
+                curr.execute(
+                    sql.SQL('CREATE TABLE {} ({});').format(
+                        table_identifier,
+                        sql.SQL(columns)
                     )
-                                        
-                    return
-        
+                )
+
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    curr.copy_expert(
+                        sql.SQL("COPY {} FROM STDIN WITH CSV HEADER DELIMITER ',' QUOTE '\"'")
+                        .format(table_identifier)
+                        .as_string(self.connection),
+                        f
+                    )
+
+                self._commit()
+
         except (Exception, p2.DatabaseError) as e:
             print(e)
-
         finally:
             self._close()
 
@@ -282,21 +317,26 @@ class DataManager:
             - table_name (str): Name of table to be deleted
         """
         
-        exists = self.table_exists(table_name)
+        if not self.table_exists(table_name):
+            return "Table does not exist..."
+        
         self._connect()
+
+        table_identifier = sql.SQL('{}.{}').format(
+            sql.Identifier(schema),
+            sql.Identifier(table_name)
+        )
 
         try: 
             with self.connection.cursor() as curr:
-                if exists:
-                    curr.execute(
-                        sql.SQL("""DROP TABLE IF EXISTS {}.{};""")
-                        .format(
-                            sql.Identifier(schema),
-                            sql.Identifier(table_name)
-                            )
-                    )
-                    
-                    self._commit()
+                curr.execute(
+                    sql.SQL("""DROP TABLE IF EXISTS {};""")
+                    .format(table_identifier)
+                )
+                
+                self._commit()
+
+                print("SUCCESS: Table deleted.")
         
         except (Exception, p2.DatabaseError) as e:
             print(e)
