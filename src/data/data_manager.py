@@ -2,7 +2,6 @@ import pandas as pd
 import psycopg2 as p2
 import os
 
-from sqlalchemy import create_engine
 from psycopg2 import sql
 from dotenv import load_dotenv
 
@@ -19,7 +18,6 @@ class DataManager:
     """
 
     connection = None
-
     dbname=os.getenv("DB_NAME")
     user=os.getenv("DB_USER")
     password=os.getenv("DB_PASSWORD")
@@ -69,6 +67,17 @@ class DataManager:
         """
         self.connection.commit()
 
+
+    def _create_identifier(self
+                           ,schema: str
+                           ,table_name: str):
+        
+        identifier = sql.SQL('{}.{}').format(
+                        sql.Identifier(schema),
+                        sql.Identifier(table_name)
+                    )
+        
+        return identifier
 
     # Metadata Functions
     def get_schema(self, 
@@ -156,9 +165,15 @@ class DataManager:
 
     # Accessing functions 
     def load_table(self
+                   ,schema: str
                    ,table_name: str) -> pd.DataFrame:
+        
+        if not self.table_exists(table_name):
+            return("Table does not exist.")
 
         self._connect()
+
+        table_identifier = self._create_identifier(schema, table_name)
 
         try: 
             with self.connection.cursor() as curr:
@@ -168,9 +183,7 @@ class DataManager:
                         *
                     
                     FROM
-                        {};""").format(
-                            sql.Identifier(table_name)
-                        )
+                        {};""").format(table_identifier)
                     )
 
                 res = curr.fetchall()
@@ -258,10 +271,7 @@ class DataManager:
         if self.table_exists(table_name):
             return "Table already exists!"
 
-        table_identifier = sql.SQL('{}.{}').format(
-                sql.Identifier(schema),
-                sql.Identifier(table_name)
-            )
+        table_identifier = self._create_identifier(schema, table_name)
 
         dtype_map = {
             'int64': 'BIGINT', 'Int64': 'BIGINT',
@@ -299,6 +309,8 @@ class DataManager:
 
                 self._commit()
 
+                print("SUCCESS: Table created and copied.")
+
         except (Exception, p2.DatabaseError) as e:
             print(e)
         finally:
@@ -322,10 +334,7 @@ class DataManager:
         
         self._connect()
 
-        table_identifier = sql.SQL('{}.{}').format(
-            sql.Identifier(schema),
-            sql.Identifier(table_name)
-        )
+        table_identifier = self._create_identifier(schema, table_name)
 
         try: 
             with self.connection.cursor() as curr:

@@ -6,14 +6,20 @@ of it in this folder is to both test, and act as an example for how to use the D
 
 from data_manager import DataManager
 
-dm = DataManager("hahahaha")
+dm = DataManager("hahahah")
 
 # print(dm.table_exists("housing_data") == False)
 
-# if dm.table_exists("housing_data") == False:
-#     dm.create_table_from_csv("test_schema" 
-#                              ,"housing_data"
-#                              ,"src/data/Housing.csv")
+if dm.table_exists("housing_data") == False:
+    dm.create_table_from_csv("test_schema" 
+                             ,"housing_data"
+                             ,"src/data/Housing.csv")
     
-# dm.delete_table("test_schema"
-#                 ,"housing_data")
+
+df = dm.load_table("test_schema"
+              ,"housing_data")
+
+print(df.head(5))
+
+dm.delete_table("test_schema"
+                ,"housing_data")
