@@ -224,38 +224,6 @@ class DataManager:
             self._close()
 
 
-    def load_filtered(table_name: str,
-                      filters: dict) -> pd.DataFrame:
-        pass
-
-
-    # Uploading functions
-    def upload_table(table_name: str,
-                     df: pd.DataFrame,
-                     if_exists="replace") -> None:
-        pass
-
-
-    def replace_table(table_name: str,
-                      df: pd.DataFrame) -> None:
-        pass
-
-
-    def append_to_table(table_name: str,
-                        df: pd.DataFrame) -> None:
-        pass
-
-
-    def upsert(table_name: str,
-               df: pd.DataFrame) -> None:
-        pass
-
-
-    def bulk_insert(table_name: str,
-                    df: pd.DataFrame) -> None:
-        pass
-
-
     # Table Management Functions
     def create_table_from_csv(self 
                               ,schema:str
