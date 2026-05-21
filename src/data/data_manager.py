@@ -115,11 +115,6 @@ class DataManager:
             self._close()
 
 
-    def ensure_schema(table_name: str,
-                      df: pd.DataFrame) -> str:
-        pass
-
-
     def table_exists(self 
                      ,table_name: str) -> bool:
         """
