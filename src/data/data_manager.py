@@ -1,6 +1,7 @@
 import pandas as pd
 import psycopg2 as p2
 import os
+import io
 
 from psycopg2 import sql
 from dotenv import load_dotenv
@@ -279,6 +280,59 @@ class DataManager:
         finally:
             self._close()
 
+
+    def create_table_from_df(self
+                            ,schema: str
+                            ,table_name: str
+                            ,df: pd.DataFrame):
+        
+        if self.table_exists(table_name):
+            return "Table already exists!"
+        
+        table_identifier = self._create_identifier(schema, table_name)
+
+        dtype_map = {
+            'int64': 'BIGINT', 'Int64': 'BIGINT',
+            'int32': 'INTEGER', 'Int32': 'INTEGER',
+            'float64': 'DOUBLE PRECISION', 'float32': 'REAL',
+            'bool': 'BOOLEAN', 'boolean': 'BOOLEAN',
+            'object': 'TEXT', 'string': 'TEXT',
+            'datetime64[ns]': 'TIMESTAMP', 'category': 'TEXT',
+        }
+
+        columns = ', '.join(
+            f'"{col}" {dtype_map.get(str(dtype), "TEXT")}'
+            for col, dtype in df.dtypes.items()
+        )
+
+        self._connect()
+        try:
+            with self.connection.cursor() as curr:
+                curr.execute(
+                    sql.SQL('CREATE TABLE {} ({});').format(
+                        table_identifier,
+                        sql.SQL(columns)
+                    )
+                )
+
+                buffer = io.StringIO() # creates empty in-memory "file"
+                df.to_csv(buffer, index=False) # Write df as csv into "file"
+                buffer.seek(0) 
+
+                curr.copy_expert(
+                    sql.SQL("COPY {} FROM STDIN WITH CSV HEADER DELIMITER ',' QUOTE '\"'")
+                    .format(table_identifier)
+                    .as_string(self.connection),
+                    buffer
+                )
+
+                self._commit()
+                print("SUCCESS: Table created and copied.")
+
+        except (Exception, p2.DatabaseError) as e:
+            print(e)
+        finally:
+            self._close()
 
     def delete_table(self
                      ,schema: str
